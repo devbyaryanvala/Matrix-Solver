@@ -66,7 +66,7 @@ No frameworks or external libraries required.
 1.  Clone the repository
 
 ``` bash
-git clone https://github.com/yourusername/matrix-solver.git
+git clone https://github.com/devbyaryanvala/Matrix-Solver.git
 ```
 
 2.  Open the project folder
