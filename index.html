@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Solver</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1c1c28;
+    --border: #2a2a3d;
+    --accent: #7c6af7;
+    --accent2: #f76a8a;
+    --accent3: #6af7c8;
+    --text: #e8e8f0;
+    --text-dim: #7a7a9a;
+    --cell-bg: #16161f;
+    --cell-hover: #1f1f30;
+    --positive: #6af7c8;
+    --negative: #f76a8a;
+    --highlight: rgba(124, 106, 247, 0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,106,247,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,247,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2.2rem, 5vw, 3.5rem);
+    font-style: italic;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .subtitle {
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 40px;
+  }
+
+  .size-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    padding: 10px 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+  }
+
+  .size-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .size-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* Main layout */
+  .main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 700px) {
+    .main { grid-template-columns: 1fr; }
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 24px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .panel-title {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .panel-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+
+  /* Matrix grid */
+  .matrix-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .matrix-bracket {
+    font-size: 3rem;
+    color: var(--accent);
+    line-height: 1;
+    font-weight: 300;
+    font-family: 'DM Serif Display', serif;
+    opacity: 0.7;
+  }
+
+  .matrix-grid {
+    display: grid;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .matrix-grid.size-2 { grid-template-columns: repeat(2, 1fr); }
+  .matrix-grid.size-3 { grid-template-columns: repeat(3, 1fr); }
+
+  .cell {
+    background: var(--cell-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 1rem;
+    text-align: center;
+    padding: 10px 6px;
+    width: 100%;
+    min-width: 0;
+    transition: all 0.15s;
+    outline: none;
+    border-radius: 1px;
+  }
+
+  .cell:focus {
+    border-color: var(--accent);
+    background: var(--cell-hover);
+    box-shadow: 0 0 0 2px rgba(124,106,247,0.2);
+  }
+
+  /* Remove arrows from number inputs */
+  .cell::-webkit-inner-spin-button,
+  .cell::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+  /* Action buttons */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--highlight);
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover {
+    background: #9580ff;
+    border-color: #9580ff;
+    color: #fff;
+  }
+
+  .btn-danger {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
+  .btn-danger:hover {
+    background: rgba(247,106,138,0.1);
+  }
+
+  /* Results */
+  .results {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .result-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    padding: 16px;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .result-card.accent2 { border-left-color: var(--accent2); }
+  .result-card.accent3 { border-left-color: var(--accent3); }
+
+  .result-label {
+    font-size: 0.65rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .result-value {
+    font-size: 1.4rem;
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+  }
+
+  .result-value.positive { color: var(--positive); }
+  .result-value.negative { color: var(--negative); }
+  .result-value.zero { color: var(--text-dim); }
+
+  /* Matrix result display */
+  .result-matrix {
+    display: grid;
+    gap: 4px;
+    max-width: 280px;
+  }
+
+  .result-matrix.size-2 { grid-template-columns: repeat(2, 1fr); }
+  .result-matrix.size-3 { grid-template-columns: repeat(3, 1fr); }
+
+  .result-cell {
+    background: var(--cell-bg);
+    border: 1px solid var(--border);
+    padding: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-family: 'Space Mono', monospace;
+    border-radius: 1px;
+  }
+
+  /* Steps panel */
+  .steps-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 24px;
+    margin-bottom: 24px;
+  }
+
+  .steps-content {
+    font-size: 0.82rem;
+    line-height: 1.8;
+    color: var(--text-dim);
+  }
+
+  .steps-content .step-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(42,42,61,0.5);
+  }
+
+  .step-num {
+    color: var(--accent);
+    font-weight: 700;
+    min-width: 24px;
+  }
+
+  .step-text { color: var(--text); }
+  .step-math { color: var(--accent3); font-style: italic; }
+  .step-result { color: var(--positive); font-weight: 700; }
+
+  /* Minor/cofactor grid */
+  .minor-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .minor-cell-card {
+    background: var(--cell-bg);
+    border: 1px solid var(--border);
+    padding: 10px;
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .minor-cell-card .label {
+    color: var(--text-dim);
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .minor-cell-card .value {
+    font-size: 1rem;
+    font-family: 'DM Serif Display', serif;
+    font-style: italic;
+  }
+
+  /* Operation area */
+  .op-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 700px) {
+    .op-area { grid-template-columns: 1fr; }
+  }
+
+  /* Scalar input */
+  .scalar-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .scalar-input {
+    background: var(--cell-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    width: 80px;
+    outline: none;
+    transition: all 0.15s;
+  }
+
+  .scalar-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(124,106,247,0.2);
+  }
+
+  /* Tab nav */
+  .tab-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .tab {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 10px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    margin-bottom: -1px;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* Status badge */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  .badge-singular { background: rgba(247,106,138,0.15); color: var(--accent2); border: 1px solid rgba(247,106,138,0.3); }
+  .badge-invertible { background: rgba(106,247,200,0.1); color: var(--accent3); border: 1px solid rgba(106,247,200,0.3); }
+
+  /* Empty state */
+  .empty { color: var(--text-dim); font-size: 0.8rem; font-style: italic; }
+
+  /* Separator */
+  hr { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+  /* Formula helper */
+  .formula-box {
+    background: var(--cell-bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent3);
+    padding: 12px 16px;
+    margin-bottom: 16px;
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+
+  .formula-box strong { color: var(--accent3); }
+
+  .scrollable { max-height: 460px; overflow-y: auto; padding-right: 4px; }
+  .scrollable::-webkit-scrollbar { width: 4px; }
+  .scrollable::-webkit-scrollbar-track { background: var(--surface); }
+  .scrollable::-webkit-scrollbar-thumb { background: var(--border); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">Matrix Solver</div>
+    <div class="subtitle">Determinants · Minors · Cofactors · Inverse · Operations</div>
+  </header>
+
+  <!-- Size selector -->
+  <div class="controls">
+    <button class="size-btn active" onclick="setSize(2)">2 × 2</button>
+    <button class="size-btn" onclick="setSize(3)">3 × 3</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tab-nav">
+    <button class="tab active" onclick="switchTab('single')">Single Matrix</button>
+    <button class="tab" onclick="switchTab('operations')">Two Matrix Ops</button>
+    <button class="tab" onclick="switchTab('theory')">Concepts</button>
+  </div>
+
+  <!-- SINGLE MATRIX TAB -->
+  <div id="tab-single" class="tab-content active">
+    <div class="main">
+      <!-- Matrix A input -->
+      <div class="panel">
+        <div class="panel-title">Matrix A</div>
+        <div class="matrix-wrap">
+          <div class="matrix-bracket">[</div>
+          <div id="matrixA" class="matrix-grid size-2"></div>
+          <div class="matrix-bracket">]</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" onclick="solveAll()">▶ Solve All</button>
+          <button class="btn" onclick="fillRandom('A')">⚄ Random</button>
+          <button class="btn" onclick="fillIdentity('A')">I Identity</button>
+          <button class="btn btn-danger" onclick="clearMatrix('A')">✕ Clear</button>
+        </div>
+        <div class="actions">
+          <input type="number" id="scalarA" class="scalar-input" value="2" placeholder="k">
+          <button class="btn" onclick="scalarMultiply()">k · A</button>
+          <button class="btn" onclick="transposeA()">Aᵀ</button>
+        </div>
+      </div>
+
+      <!-- Quick results -->
+      <div class="panel">
+        <div class="panel-title">Quick Results</div>
+        <div class="results" id="quickResults">
+          <div class="empty">Enter values in Matrix A and click Solve All</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Steps & detailed results -->
+    <div class="steps-panel" id="stepsPanel" style="display:none">
+      <div class="panel-title">Step-by-Step Solution</div>
+      <div class="scrollable">
+        <div id="stepsContent" class="steps-content"></div>
+      </div>
+    </div>
+
+    <!-- Minors & Cofactors (3x3 only) -->
+    <div id="minorSection" style="display:none">
+      <div class="panel">
+        <div class="panel-title">Minors &amp; Cofactors</div>
+        <div class="formula-box">
+          <strong>Minor M<sub>ij</sub></strong>: Determinant of the (n-1)×(n-1) matrix obtained by deleting row i and column j.<br>
+          <strong>Cofactor C<sub>ij</sub></strong>: C<sub>ij</sub> = (−1)<sup>i+j</sup> · M<sub>ij</sub>
+        </div>
+        <div id="minorsGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TWO MATRIX OPS TAB -->
+  <div id="tab-operations" class="tab-content">
+    <div class="op-area">
+      <div class="panel">
+        <div class="panel-title">Matrix A</div>
+        <div class="matrix-wrap">
+          <div class="matrix-bracket">[</div>
+          <div id="matrixA2" class="matrix-grid size-2"></div>
+          <div class="matrix-bracket">]</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="fillRandom('A2')">⚄ Random</button>
+          <button class="btn btn-danger" onclick="clearMatrix('A2')">✕ Clear</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Matrix B</div>
+        <div class="matrix-wrap">
+          <div class="matrix-bracket">[</div>
+          <div id="matrixB" class="matrix-grid size-2"></div>
+          <div class="matrix-bracket">]</div>
+        </div>
+        <div class="actions">
+          <button class="btn" onclick="fillRandom('B')">⚄ Random</button>
+          <button class="btn btn-danger" onclick="clearMatrix('B')">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:24px">
+      <div class="panel-title">Operations</div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="opAdd()">A + B</button>
+        <button class="btn btn-primary" onclick="opSubtract()">A − B</button>
+        <button class="btn btn-primary" onclick="opMultiply()">A × B</button>
+        <button class="btn" onclick="opMultiply(true)">B × A</button>
+      </div>
+      <div id="opResult"></div>
+    </div>
+  </div>
+
+  <!-- THEORY TAB -->
+  <div id="tab-theory" class="tab-content">
+    <div class="panel">
+      <div class="panel-title">Key Concepts</div>
+      <div class="scrollable">
+        <div class="formula-box">
+          <strong>Determinant (2×2)</strong><br>
+          det(A) = ad − bc for A = [[a,b],[c,d]]
+        </div>
+        <div class="formula-box">
+          <strong>Determinant (3×3) — Cofactor Expansion along Row 1</strong><br>
+          det(A) = a₁₁·C₁₁ + a₁₂·C₁₂ + a₁₃·C₁₃<br>
+          where C₁₁ = +(a₂₂a₃₃ − a₂₃a₃₂), C₁₂ = −(a₂₁a₃₃ − a₂₃a₃₁), C₁₃ = +(a₂₁a₃₂ − a₂₂a₃₁)
+        </div>
+        <div class="formula-box">
+          <strong>Minor M<sub>ij</sub></strong><br>
+          The determinant of the submatrix formed by deleting the i-th row and j-th column.
+        </div>
+        <div class="formula-box">
+          <strong>Cofactor C<sub>ij</sub></strong><br>
+          C<sub>ij</sub> = (−1)<sup>i+j</sup> · M<sub>ij</sub><br>
+          Sign pattern: + − +<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;− + −<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+ − +
+        </div>
+        <div class="formula-box">
+          <strong>Adjugate (Adjoint) adj(A)</strong><br>
+          Transpose of the cofactor matrix: adj(A) = [C<sub>ij</sub>]ᵀ
+        </div>
+        <div class="formula-box">
+          <strong>Inverse A⁻¹</strong><br>
+          A⁻¹ = adj(A) / det(A) &nbsp;(exists only when det(A) ≠ 0)
+        </div>
+        <div class="formula-box">
+          <strong>Trace</strong><br>
+          tr(A) = sum of diagonal elements = a₁₁ + a₂₂ [+ a₃₃]
+        </div>
+        <div class="formula-box">
+          <strong>Transpose A<sup>T</sup></strong><br>
+          Rows become columns: (Aᵀ)<sub>ij</sub> = A<sub>ji</sub>
+        </div>
+        <div class="formula-box">
+          <strong>Rank</strong><br>
+          Maximum number of linearly independent rows/columns. For 2×2: rank = 2 if det≠0, else rank = 1 (or 0 if all zeros). For 3×3: rank = 3 if det≠0, else determined by largest non-zero minor.
+        </div>
+        <div class="formula-box">
+          <strong>Singular vs Invertible</strong><br>
+          A matrix is <em>singular</em> if det(A) = 0 (no inverse exists).<br>
+          A matrix is <em>invertible/non-singular</em> if det(A) ≠ 0.
+        </div>
+        <div class="formula-box">
+          <strong>Matrix Multiplication (A×B)</strong><br>
+          (AB)<sub>ij</sub> = Σ A<sub>ik</sub> · B<sub>kj</sub> — row i of A dotted with column j of B.
+        </div>
+        <div class="formula-box">
+          <strong>Properties</strong><br>
+          det(AB) = det(A) · det(B)<br>
+          det(Aᵀ) = det(A)<br>
+          det(kA) = kⁿ · det(A) for n×n matrix<br>
+          (AB)⁻¹ = B⁻¹ · A⁻¹<br>
+          (Aᵀ)⁻¹ = (A⁻¹)ᵀ
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let SIZE = 2;
+
+// ─── Matrix data access ─────────────────────────────────────────────────────
+
+function getMatrix(id) {
+  const grid = document.getElementById('matrix' + id);
+  const inputs = grid.querySelectorAll('input');
+  const mat = [];
+  for (let i = 0; i < SIZE; i++) {
+    mat.push([]);
+    for (let j = 0; j < SIZE; j++) {
+      const val = parseFloat(inputs[i * SIZE + j].value);
+      mat[i].push(isNaN(val) ? 0 : val);
+    }
+  }
+  return mat;
+}
+
+function setMatrix(id, mat) {
+  const grid = document.getElementById('matrix' + id);
+  const inputs = grid.querySelectorAll('input');
+  for (let i = 0; i < SIZE; i++)
+    for (let j = 0; j < SIZE; j++)
+      inputs[i * SIZE + j].value = fmt(mat[i][j]);
+}
+
+function setSize(n) {
+  SIZE = n;
+  document.querySelectorAll('.size-btn').forEach((b, i) => b.classList.toggle('active', [2,3][i] === n));
+  ['A','A2','B'].forEach(buildGrid);
+  document.getElementById('quickResults').innerHTML = '<div class="empty">Enter values and click Solve All</div>';
+  document.getElementById('stepsPanel').style.display = 'none';
+  document.getElementById('minorSection').style.display = 'none';
+  document.getElementById('opResult').innerHTML = '';
+}
+
+// ─── Formatting ──────────────────────────────────────────────────────────────
+
+function fmt(n) {
+  if (Math.abs(n) < 1e-10) return '0';
+  const r = Math.round(n * 1e8) / 1e8;
+  // Show as fraction if simple
+  if (Number.isInteger(r)) return r.toString();
+  return parseFloat(r.toFixed(6)).toString();
+}
+
+function fmtClass(n) {
+  if (Math.abs(n) < 1e-10) return 'zero';
+  return n > 0 ? 'positive' : 'negative';
+}
+
+// ─── Math core ───────────────────────────────────────────────────────────────
+
+function det2(m) {
+  return m[0][0]*m[1][1] - m[0][1]*m[1][0];
+}
+
+function subMatrix(m, ri, ci) {
+  return m.filter((_,i) => i !== ri).map(row => row.filter((_,j) => j !== ci));
+}
+
+function minor(m, i, j) {
+  return det2(subMatrix(m, i, j));
+}
+
+function cofactor(m, i, j) {
+  return Math.pow(-1, i+j) * minor(m, i, j);
+}
+
+function det3(m) {
+  return m[0][0]*cofactor(m,0,0) + m[0][1]*cofactor(m,0,1) + m[0][2]*cofactor(m,0,2);
+}
+
+function determinant(m) {
+  return SIZE === 2 ? det2(m) : det3(m);
+}
+
+function transpose(m) {
+  return m.map((row, i) => row.map((_, j) => m[j][i]));
+}
+
+function cofactorMatrix(m) {
+  return m.map((row, i) => row.map((_, j) => cofactor(m, i, j)));
+}
+
+function adjugate(m) {
+  return transpose(cofactorMatrix(m));
+}
+
+function inverse(m) {
+  const d = determinant(m);
+  if (Math.abs(d) < 1e-10) return null;
+  const adj = adjugate(m);
+  return adj.map(row => row.map(v => v / d));
+}
+
+function trace(m) {
+  return m.reduce((s, row, i) => s + row[i], 0);
+}
+
+function addMat(a, b) { return a.map((row,i) => row.map((v,j) => v + b[i][j])); }
+function subMat(a, b) { return a.map((row,i) => row.map((v,j) => v - b[i][j])); }
+function mulMat(a, b) {
+  return a.map((row,i) => b[0].map((_,j) => row.reduce((s,_,k) => s + a[i][k]*b[k][j], 0)));
+}
+
+// ─── Solve All ───────────────────────────────────────────────────────────────
+
+function solveAll() {
+  const m = getMatrix('A');
+  const d = determinant(m);
+  const tr = trace(m);
+  const inv = inverse(m);
+  const adj = adjugate(m);
+  const tp = transpose(m);
+  const singular = Math.abs(d) < 1e-10;
+
+  // Quick results
+  const qr = document.getElementById('quickResults');
+  qr.innerHTML = `
+    <div class="result-card">
+      <div class="result-label">Determinant · det(A)</div>
+      <div class="result-value ${fmtClass(d)}">${fmt(d)} ${singular ? '<span class="badge badge-singular">Singular</span>' : '<span class="badge badge-invertible">Invertible</span>'}</div>
+    </div>
+    <div class="result-card accent2">
+      <div class="result-label">Trace · tr(A)</div>
+      <div class="result-value">${fmt(tr)}</div>
+    </div>
+    <div class="result-card accent3">
+      <div class="result-label">Transpose · Aᵀ</div>
+      ${matrixDisplay(tp)}
+    </div>
+    <div class="result-card">
+      <div class="result-label">Adjugate · adj(A)</div>
+      ${matrixDisplay(adj)}
+    </div>
+    <div class="result-card ${singular ? '' : 'accent3'}">
+      <div class="result-label">Inverse · A⁻¹</div>
+      ${singular
+        ? '<div class="result-value negative">Not Invertible (det = 0)</div>'
+        : matrixDisplay(inv)}
+    </div>
+  `;
+
+  // Steps
+  buildSteps(m, d, inv, adj);
+
+  // Minors/Cofactors (3x3)
+  if (SIZE === 3) {
+    const ms = document.getElementById('minorSection');
+    ms.style.display = 'block';
+    buildMinors(m);
+  } else {
+    document.getElementById('minorSection').style.display = 'none';
+  }
+}
+
+function matrixDisplay(m) {
+  const rows = m.map(row => row.map(v => `<div class="result-cell">${fmt(v)}</div>`).join('')).join('');
+  return `<div class="result-matrix size-${SIZE}" style="margin-top:8px">${rows}</div>`;
+}
+
+// ─── Steps builder ───────────────────────────────────────────────────────────
+
+function buildSteps(m, d, inv, adj) {
+  const panel = document.getElementById('stepsPanel');
+  const content = document.getElementById('stepsContent');
+  panel.style.display = 'block';
+
+  let html = '';
+  const step = (n, text, math='', result='') => {
+    html += `<div class="step-line">
+      <span class="step-num">${n}.</span>
+      <span>${text} ${math ? `<span class="step-math">${math}</span>` : ''} ${result ? `<span class="step-result">= ${result}</span>` : ''}</span>
+    </div>`;
+  };
+
+  if (SIZE === 2) {
+    const [[a,b],[c,d2]] = m;
+    step(1, 'Identify elements:', `a=${fmt(a)}, b=${fmt(b)}, c=${fmt(c)}, d=${fmt(d2)}`);
+    step(2, 'Apply formula:', 'det(A) = ad − bc', `${fmt(a)}×${fmt(d2)} − ${fmt(b)}×${fmt(c)} = ${fmt(d)}`);
+    step(3, 'Trace:', 'tr(A) = a + d', fmt(a + d2));
+    step(4, 'Cofactor matrix:', `C₁₁=+${fmt(d2)}, C₁₂=−${fmt(c)}, C₂₁=−${fmt(b)}, C₂₂=+${fmt(a)}`);
+    step(5, 'Adjugate = Transpose of cofactor matrix');
+    if (Math.abs(d) < 1e-10) {
+      step(6, 'Inverse:', 'det(A) = 0 → A⁻¹ does not exist');
+    } else {
+      step(6, 'Inverse:', `A⁻¹ = adj(A) / ${fmt(d)}`, `[[${fmt(inv[0][0])}, ${fmt(inv[0][1])}], [${fmt(inv[1][0])}, ${fmt(inv[1][1])}]]`);
+      step(7, 'Verify: A × A⁻¹ should equal I');
+    }
+  } else {
+    const [r0, r1, r2] = m;
+    step(1, 'Matrix A:', `Row1=[${r0.map(fmt).join(', ')}], Row2=[${r1.map(fmt).join(', ')}], Row3=[${r2.map(fmt).join(', ')}]`);
+    step(2, 'Cofactor expansion along Row 1:');
+    step(3, `Minor M₁₁ = det([[${fmt(r1[1])},${fmt(r1[2])}}],[${fmt(r2[1])},${fmt(r2[2])}]])`, '', fmt(minor(m,0,0)));
+    step(4, `Cofactor C₁₁ = (+1) × M₁₁`, '', fmt(cofactor(m,0,0)));
+    step(5, `Minor M₁₂ = det([[${fmt(r1[0])},${fmt(r1[2])}}],[${fmt(r2[0])},${fmt(r2[2])}]])`, '', fmt(minor(m,0,1)));
+    step(6, `Cofactor C₁₂ = (−1) × M₁₂`, '', fmt(cofactor(m,0,1)));
+    step(7, `Minor M₁₃ = det([[${fmt(r1[0])},${fmt(r1[1])}}],[${fmt(r2[0])},${fmt(r2[1])}]])`, '', fmt(minor(m,0,2)));
+    step(8, `Cofactor C₁₃ = (+1) × M₁₃`, '', fmt(cofactor(m,0,2)));
+    step(9, 'det(A) =', `a₁₁·C₁₁ + a₁₂·C₁₂ + a₁₃·C₁₃ = ${fmt(r0[0])}×${fmt(cofactor(m,0,0))} + ${fmt(r0[1])}×${fmt(cofactor(m,0,1))} + ${fmt(r0[2])}×${fmt(cofactor(m,0,2))}`, fmt(d));
+    step(10, 'Trace:', `a₁₁ + a₂₂ + a₃₃ = ${fmt(r0[0])} + ${fmt(r1[1])} + ${fmt(r2[2])}`, fmt(trace(m)));
+    if (Math.abs(d) < 1e-10) {
+      step(11, 'Inverse: NOT POSSIBLE — matrix is singular (det = 0)');
+    } else {
+      step(11, 'Build full cofactor matrix (all 9 cofactors)');
+      step(12, 'adj(A) = transpose of cofactor matrix');
+      step(13, 'A⁻¹ = adj(A) / det(A)', `divide each element of adj(A) by ${fmt(d)}`);
+    }
+  }
+
+  content.innerHTML = html;
+}
+
+// ─── Minors/Cofactors grid ────────────────────────────────────────────────────
+
+function buildMinors(m) {
+  let html = '<div class="minor-grid">';
+  for (let i = 0; i < SIZE; i++) {
+    for (let j = 0; j < SIZE; j++) {
+      const mn = minor(m, i, j);
+      const cf = cofactor(m, i, j);
+      const sign = ((i+j) % 2 === 0) ? '+' : '−';
+      html += `<div class="minor-cell-card">
+        <div class="label">M<sub>${i+1}${j+1}</sub> / C<sub>${i+1}${j+1}</sub></div>
+        <div class="value" style="color:var(--accent3)">M = ${fmt(mn)}</div>
+        <div style="font-size:0.7rem;color:var(--text-dim);margin-top:2px">sign: ${sign}</div>
+        <div class="value" style="color:var(--accent2)">C = ${fmt(cf)}</div>
+      </div>`;
+    }
+  }
+  html += '</div>';
+  document.getElementById('minorsGrid').innerHTML = html;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fillRandom(id) {
+  const grid = document.getElementById('matrix' + id);
+  grid.querySelectorAll('input').forEach(inp => {
+    inp.value = Math.floor(Math.random() * 9) - 4;
+  });
+}
+
+function fillIdentity(id) {
+  const mat = Array.from({length:SIZE}, (_,i) => Array.from({length:SIZE}, (_,j) => i===j?1:0));
+  setMatrix(id, mat);
+}
+
+function clearMatrix(id) {
+  document.getElementById('matrix'+id).querySelectorAll('input').forEach(i => i.value = '');
+}
+
+function scalarMultiply() {
+  const k = parseFloat(document.getElementById('scalarA').value) || 1;
+  const m = getMatrix('A');
+  setMatrix('A', m.map(row => row.map(v => v * k)));
+}
+
+function transposeA() {
+  const m = getMatrix('A');
+  setMatrix('A', transpose(m));
+}
+
+// ─── Two-matrix ops ──────────────────────────────────────────────────────────
+
+function showOpResult(label, mat) {
+  const div = document.getElementById('opResult');
+  div.innerHTML = `<hr><div class="result-label" style="margin-bottom:8px">${label}</div>${matrixDisplay(mat)}`;
+}
+
+function opAdd() {
+  try { showOpResult('A + B', addMat(getMatrix('A2'), getMatrix('B'))); }
+  catch(e) { showError(); }
+}
+
+function opSubtract() {
+  try { showOpResult('A − B', subMat(getMatrix('A2'), getMatrix('B'))); }
+  catch(e) { showError(); }
+}
+
+function opMultiply(reverse=false) {
+  try {
+    const a = getMatrix('A2'), b = getMatrix('B');
+    showOpResult(reverse ? 'B × A' : 'A × B', reverse ? mulMat(b,a) : mulMat(a,b));
+  } catch(e) { showError(); }
+}
+
+function showError() {
+  document.getElementById('opResult').innerHTML = '<div class="result-value negative">Check your inputs</div>';
+}
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['single','operations','theory'][i] === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+function buildGrid(id) {
+  const grid = document.getElementById('matrix' + id);
+  if (!grid) return;
+  grid.className = `matrix-grid size-${SIZE}`;
+  grid.innerHTML = '';
+  for (let i = 0; i < SIZE; i++)
+    for (let j = 0; j < SIZE; j++) {
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.className = 'cell';
+      inp.placeholder = `a${i+1}${j+1}`;
+      inp.step = 'any';
+      grid.appendChild(inp);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ['A','A2','B'].forEach(buildGrid);
+});
+</script>
+</body>
+</html>
